@@ -73,16 +73,18 @@ bool V4l2Encoder::start()
 
 bool V4l2Encoder::stop()
 {
-  v4l2_encoder_cmd cmd = {};
-  cmd.cmd = V4L2_ENC_CMD_STOP;
-  driver->encCommand(&cmd);
-  return V4l2Codec::stop();
+  bool drained = drainAndWait();
+  return V4l2Codec::stop() && drained;
 }
 
 void V4l2Encoder::setCodecFormat()
 {
   auto setting = get<V4l2Format>(OUTPUT_PORT);
   *setting = compressedFormat;
+
+  auto input = get<V4l2Format>(INPUT_PORT);
+  Resolution resolution{ input->width, input->height };
+  *setting = resolution;
 }
 
 bool V4l2Encoder::drain()

@@ -55,13 +55,11 @@ bool V4l2Decoder::start()
 
 bool V4l2Decoder::stop()
 {
-  v4l2_decoder_cmd cmd = {};
+  bool drained = drainAndWait();
   getDriver()->unsubscribeEvent(V4L2_EVENT_SOURCE_CHANGE);
   getDriver()->unsubscribeEvent(V4L2_EVENT_EOS);
-  cmd.cmd = V4L2_DEC_CMD_STOP;
-  driver->decCommand(&cmd);
   outputPortStarted = false;
-  return V4l2Codec::stop();
+  return V4l2Codec::stop() && drained;
 }
 
 void V4l2Decoder::setCodecFormat()
@@ -90,7 +88,11 @@ bool V4l2Decoder::reconfigurePort(bool port)
   prepareBufferPool<DmabufAllocator>(OUTPUT_PORT);
   startStreaming(OUTPUT_PORT);
   outputPortStarted = true;
-  state = STARTED;
+  {
+    std::lock_guard lock(drainMutex_);
+    state = STARTED;
+  }
+  drainCv_.notify_all();
   feedOutputBuffer();
   return true;
 }
